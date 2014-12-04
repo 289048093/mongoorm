@@ -12,7 +12,7 @@ import java.util.concurrent.ConcurrentHashMap;
 /**
  * MongoDb单例
  *
- * @author pushihao
+ * @author lizhao
  */
 public class MongoDb {
 
@@ -28,6 +28,9 @@ public class MongoDb {
         MongoDb.configPath = configPath;
     }
 
+    private MongoDb(){
+        initDb();
+    }
     /**
      * 初始化db连接属性
      */
