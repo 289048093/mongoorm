@@ -40,7 +40,7 @@ public class ConfigInfo {
 
     private Object getEval(String key) throws ScriptException {
         String val = getString(key);
-        if (val == null || val.matches("^\\d*$")) {
+        if (val == null) {
             return null;
         }
         return jsEngine.eval(val);

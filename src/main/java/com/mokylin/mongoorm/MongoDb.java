@@ -35,6 +35,9 @@ public class MongoDb {
      * 初始化db连接属性
      */
     public void initDb() {
+        if(StringUtils.isBlank(getConfigPath())){
+            throw new IllegalStateException("没有配置configPath");
+        }
         if (mongo == null) {
             try {
                 mongo = new Mongo(dbUrl, dbPort);
@@ -59,6 +62,12 @@ public class MongoDb {
                 }
             }
         }
+        Runtime.getRuntime().addShutdownHook(new Thread(){
+            @Override
+            public void run() {
+                getInstance().destroy();
+            }
+        });
     }
 
     /**
