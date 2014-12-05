@@ -39,7 +39,7 @@ public void testInstanceOf() throws Exception {
     user.setNickName("汤姆");
     user.setAge(22);
     RoleModel role = new RoleModel();
-    role.setName("老板");
+    role.setName("程序员");
     user.setRole(role);
     MongoBaseDAO<RoleModel> roleDao = MongoBaseDAO.instanceOf(RoleModel.class);
     roleDao.insert(role);
