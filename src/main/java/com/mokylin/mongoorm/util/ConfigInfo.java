@@ -34,6 +34,17 @@ public class ConfigInfo {
     private static ScriptEngineManager manager = new ScriptEngineManager();
     private static ScriptEngine jsEngine = manager.getEngineByName("JavaScript");
 
+
+    private static String configPath;
+
+    public static String getConfigPath() {
+        return configPath;
+    }
+
+    public static void setConfigPath(String configPath) {
+        ConfigInfo.configPath = configPath;
+    }
+
     private Object getEval(Enum key) throws ScriptException {
         return getEval(key.toString());
     }

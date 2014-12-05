@@ -18,18 +18,12 @@ public class MongoDb {
 
     private static Logger LOGGER = LoggerFactory.getLogger(MongoDb.class);
 
-    private static String configPath;
-
-    public static String getConfigPath() {
-        return configPath;
-    }
-
-    public static void setConfigPath(String configPath) {
-        MongoDb.configPath = configPath;
-    }
-
     private MongoDb(){
         initDb();
+    }
+
+    private static String getConfigPath(){
+        return ConfigInfo.getConfigPath();
     }
     /**
      * 初始化db连接属性
@@ -103,17 +97,7 @@ public class MongoDb {
     public final ConcurrentHashMap<String, DBCollection> cache = new ConcurrentHashMap<>();
 
     public DBCollection getCollection(String tableName) {
-        DBCollection dbCollection = cache.get(tableName);
-        if (dbCollection == null) {
-            synchronized (cache) {
-                dbCollection = cache.get(tableName);
-                if (dbCollection == null) {
-                    dbCollection = db.getCollection(tableName);
-                    cache.put(tableName, dbCollection);
-                }
-            }
-        }
-        return dbCollection;
+        return db.getCollection(tableName);
     }
 
 }

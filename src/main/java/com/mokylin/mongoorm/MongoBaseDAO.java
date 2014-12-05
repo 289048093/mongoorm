@@ -29,18 +29,13 @@ public class MongoBaseDAO<T extends BaseModel> extends AbstractBaseDAO<T> {
     public static <V extends BaseModel> MongoBaseDAO<V> instanceOf(Class<V> clazz) {
         //noinspection unchecked
         MongoBaseDAO<V> dao = (MongoBaseDAO<V>) instances.get(clazz);
-        if (dao == null) {
-            synchronized (instances) {
-                //noinspection unchecked
-                dao = (MongoBaseDAO<V>) instances.get(clazz);
-                if (dao == null) {
-                    dao = new MongoBaseDAO<>();
-                    dao.setModelClazz(clazz);
-                    instances.put(clazz, dao);
-                }
-            }
+        if (dao != null) {
+            return dao;
         }
-        return dao;
+        MongoBaseDAO<V> daoTmp = new MongoBaseDAO<>();
+        daoTmp.setModelClazz(clazz);
+        MongoBaseDAO existDao = instances.putIfAbsent(clazz, daoTmp);
+        return existDao != null ? existDao : daoTmp;
     }
 
     @Override
@@ -206,11 +201,14 @@ public class MongoBaseDAO<T extends BaseModel> extends AbstractBaseDAO<T> {
                         dbVal = ev.name();
                     }
                 }
+                if (fieldVal instanceof BaseModel) {
+                    dbVal = ((BaseModel) fieldVal).getId();
+                }
                 Custom customAnn = ClassInfoCache.getAnnotation(field, Custom.class);
                 if (customAnn != null) {
                     Class<? extends CustomConverter> converterClazz = customAnn.converter();
-                    CustomConverter converter = ClassInfoCache.getInstance(converterClazz);
-                    converter.setFieldClazz(field.getClass());
+                    CustomConverter converter = ClassInfoCache.getSingleton(converterClazz);
+                    converter.setFieldClazz(field.getDeclaringClass());
                     dbVal = converter.serialize(fieldVal);
                 }
                 object.put(dbCol, dbVal);
@@ -250,10 +248,14 @@ public class MongoBaseDAO<T extends BaseModel> extends AbstractBaseDAO<T> {
                     fieldVal = dbVal;
                 }
                 Custom customAnn = ClassInfoCache.getAnnotation(field, Custom.class);
+                if (BaseModel.class.isAssignableFrom(field.getDeclaringClass())) {
+                    fieldVal = field.getDeclaringClass().newInstance();
+                    ((BaseModel) fieldVal).setId((ObjectId) dbVal);
+                }
                 if (customAnn != null) {
                     Class<? extends CustomConverter> converterClazz = customAnn.converter();
-                    CustomConverter converter = ClassInfoCache.getInstance(converterClazz);
-                    converter.setFieldClazz(field.getClass());
+                    CustomConverter converter = ClassInfoCache.getSingleton(converterClazz);
+                    converter.setFieldClazz(field.getDeclaringClass());
                     fieldVal = converter.deSerialize(dbVal);
                 }
                 field.set(t, fieldVal);
