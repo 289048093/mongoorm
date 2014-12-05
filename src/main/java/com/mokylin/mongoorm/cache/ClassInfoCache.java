@@ -24,9 +24,36 @@ public class ClassInfoCache {
 
     private static final ConcurrentHashMap<Class<?>, SoftReference<Map<String,Method>>> methodCache = new ConcurrentHashMap<>();
 
+    private static final ConcurrentHashMap<Class<?>, SoftReference<Object>> singleInstance = new ConcurrentHashMap<>();
+
     private static final ConcurrentHashMap<AnnotatedElement, SoftReference<Map<Class<? extends Annotation>,Annotation>>> annotationCache = new ConcurrentHashMap<>();
 
 
+    public static <T> T getInstance(Class<T> clazz){
+        SoftReference<Object> ref = singleInstance.get(clazz);
+        Object t = null;
+        if(ref!=null){
+            t = ref.get();
+        }
+        if(t==null){
+            synchronized (singleInstance){
+                ref = singleInstance.get(clazz);
+                t = null;
+                if(ref!=null){
+                    t = ref.get();
+                }
+                if(t==null){
+                    try {
+                        t=clazz.newInstance();
+                        singleInstance.put(clazz,new SoftReference<Object>(t));
+                    } catch (Exception e) {
+                        throw new IllegalArgumentException(clazz.getName()+" class must has no args public constructor!");
+                    }
+                }
+            }
+        }
+        return clazz.cast(t);
+    }
     /**
      * 获取clazz的methodName方法
      * @param clazz

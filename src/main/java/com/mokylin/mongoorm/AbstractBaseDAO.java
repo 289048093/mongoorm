@@ -8,14 +8,14 @@ package com.mokylin.mongoorm;
 public abstract class AbstractBaseDAO<T extends BaseModel> implements BaseDAO<T> {
 
 
-    private Class<T> clazz;
+    private Class<T> modelClazz;
 
-    protected  void setClass(Class<T> clazz){
-       this.clazz = clazz;
+    protected  void setModelClazz(Class<T> modelClazz){
+       this.modelClazz = modelClazz;
     }
 
-    protected Class<T> getClazz() {
-        return clazz;
+    protected Class<T> getModelClazz() {
+        return modelClazz;
     }
 
 

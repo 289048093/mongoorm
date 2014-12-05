@@ -1,9 +1,6 @@
 package com.mokylin.mongoorm;
 
-import com.mokylin.mongoorm.annotation.Column;
-import com.mokylin.mongoorm.annotation.EnumValue;
-import com.mokylin.mongoorm.annotation.EnumValueType;
-import com.mokylin.mongoorm.annotation.Table;
+import com.mokylin.mongoorm.annotation.*;
 import com.mokylin.mongoorm.cache.ClassInfoCache;
 import com.mongodb.*;
 import org.bson.types.ObjectId;
@@ -38,7 +35,7 @@ public class MongoBaseDAO<T extends BaseModel> extends AbstractBaseDAO<T> {
                 dao = (MongoBaseDAO<V>) instances.get(clazz);
                 if (dao == null) {
                     dao = new MongoBaseDAO<>();
-                    dao.setClass(clazz);
+                    dao.setModelClazz(clazz);
                     instances.put(clazz, dao);
                 }
             }
@@ -52,6 +49,14 @@ public class MongoBaseDAO<T extends BaseModel> extends AbstractBaseDAO<T> {
         WriteResult res = getCollection().insert(dbObject);
         t.setId(getId(dbObject));
         return res;
+    }
+
+    @Override
+    public WriteResult saveOrUpdate(T t) {
+        if (t.getId() != null) {
+            return update(t);
+        }
+        return insert(t);
     }
 
     @Override
@@ -70,12 +75,12 @@ public class MongoBaseDAO<T extends BaseModel> extends AbstractBaseDAO<T> {
     }
 
     @Override
-    public List<T> find(DBObject query,int start,int limit) {
+    public List<T> find(DBObject query, int start, int limit) {
         DBCursor dbObjects = getCollection().find(query);
-        if(start>0){
+        if (start > 0) {
             dbObjects.skip(start);
         }
-        if(limit>0){
+        if (limit > 0) {
             dbObjects.limit(limit);
         }
         List<T> res = new LinkedList<>();
@@ -87,7 +92,7 @@ public class MongoBaseDAO<T extends BaseModel> extends AbstractBaseDAO<T> {
 
     @Override
     public T findOne(DBObject query) {
-       return getModel(getCollection().findOne(query));
+        return getModel(getCollection().findOne(query));
     }
 
     @Override
@@ -140,17 +145,16 @@ public class MongoBaseDAO<T extends BaseModel> extends AbstractBaseDAO<T> {
 
     @Override
     public DBCollection getCollection() {
-        Table annotation = ClassInfoCache.getAnnotation(getClazz(), Table.class);
+        Table annotation = ClassInfoCache.getAnnotation(getModelClazz(), Table.class);
         String tableName;
         if (annotation != null) {
             tableName = annotation.value();
         } else {
 //            throw new IllegalArgumentException("该类没有指定Table");
-            tableName = getClazz().getSimpleName();
+            tableName = getModelClazz().getSimpleName();
         }
         return MongoDb.getInstance().getCollection(tableName);
     }
-
 
 
     /**
@@ -160,7 +164,7 @@ public class MongoBaseDAO<T extends BaseModel> extends AbstractBaseDAO<T> {
      * @return
      */
     public DBObject getDBObject(Object entity) {
-        if(entity==null){
+        if (entity == null) {
             return null;
         }
         DBObject object = new BasicDBObject();
@@ -174,34 +178,42 @@ public class MongoBaseDAO<T extends BaseModel> extends AbstractBaseDAO<T> {
             }
             String dbCol = column.value();
             try {
-                Object val = field.get(entity);
-                if (val instanceof Enum) {
-                    Enum ev = (Enum) val;
+                Object fieldVal = field.get(entity);
+                Object dbVal = fieldVal;
+                if (fieldVal instanceof Enum) {
+                    Enum ev = (Enum) fieldVal;
                     EnumValue enumValue = ClassInfoCache.getAnnotation(field, EnumValue.class);
                     if (enumValue != null) {
                         EnumValueType type = enumValue.value();
                         switch (type) {
                             case NAME:
-                                val = ev.name();
+                                dbVal = ev.name();
                                 break;
                             case STRING:
-                                val = ev.toString();
+                                dbVal = ev.toString();
                                 break;
                             case CUSTOM:
                                 String methodName = enumValue.method();
                                 try {
-                                    Method enumMethod = ClassInfoCache.getMethod(val.getClass(), methodName);
-                                    val = enumMethod.invoke(val);
+                                    Method enumMethod = ClassInfoCache.getMethod(fieldVal.getClass(), methodName);
+                                    dbVal = enumMethod.invoke(fieldVal);
                                 } catch (Exception e) {
                                     LOGGER.error(e.getMessage(), e);
                                 }
                                 break;
                         }
                     } else {
-                        val = ev.name();
+                        dbVal = ev.name();
                     }
                 }
-                object.put(dbCol, val);
+                Custom customAnn = ClassInfoCache.getAnnotation(field, Custom.class);
+                if (customAnn != null) {
+                    Class<? extends CustomConverter> converterClazz = customAnn.converter();
+                    CustomConverter converter = ClassInfoCache.getInstance(converterClazz);
+                    converter.setFieldClazz(field.getClass());
+                    dbVal = converter.serialize(fieldVal);
+                }
+                object.put(dbCol, dbVal);
             } catch (IllegalAccessException e) {
                 LOGGER.error(e.getMessage(), e);
             }
@@ -216,23 +228,33 @@ public class MongoBaseDAO<T extends BaseModel> extends AbstractBaseDAO<T> {
      * @return
      */
     public T getModel(DBObject dbo) {
-        if(dbo==null){
+        if (dbo == null) {
             return null;
         }
-        Collection<Field> fields = ClassInfoCache.getPersistFields(getClazz());
+        Collection<Field> fields = ClassInfoCache.getPersistFields(getModelClazz());
         T t = null;
         try {
-            t = getClazz().newInstance();
+            t = getModelClazz().newInstance();
             for (Field field : fields) {
                 Column column = ClassInfoCache.getAnnotation(field, Column.class);
                 String dbCol = column.value();
                 Object dbVal = dbo.get(dbCol);
+                if (dbVal == null) {
+                    continue;
+                }
                 Object fieldVal = null;
                 Class<?> type = field.getType();
                 if (Enum.class.isAssignableFrom(type)) {
                     fieldVal = getEnumValue(field, dbVal);
                 } else {
                     fieldVal = dbVal;
+                }
+                Custom customAnn = ClassInfoCache.getAnnotation(field, Custom.class);
+                if (customAnn != null) {
+                    Class<? extends CustomConverter> converterClazz = customAnn.converter();
+                    CustomConverter converter = ClassInfoCache.getInstance(converterClazz);
+                    converter.setFieldClazz(field.getClass());
+                    fieldVal = converter.deSerialize(dbVal);
                 }
                 field.set(t, fieldVal);
             }
@@ -271,7 +293,7 @@ public class MongoBaseDAO<T extends BaseModel> extends AbstractBaseDAO<T> {
     }
 
     private Object getEnumByMethodValue(String methodName, Class<? extends Enum> enumClass, Object fieldValue) throws NoSuchFieldException, IllegalAccessException, NoSuchMethodException, InvocationTargetException {
-        Method method = ClassInfoCache.getMethod(enumClass,"values");
+        Method method = ClassInfoCache.getMethod(enumClass, "values");
         Object[] objs = (Object[]) method.invoke(enumClass);
         for (Object obj : objs) {
             Method enumMethod = ClassInfoCache.getMethod(obj.getClass(), methodName);

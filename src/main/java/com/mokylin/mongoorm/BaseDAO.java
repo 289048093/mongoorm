@@ -18,6 +18,8 @@ public interface BaseDAO<T extends BaseModel> {
 
     WriteResult insert(T t);
 
+    WriteResult saveOrUpdate(T t);
+
     T get(ObjectId id);
 
     List<T> find(DBObject query);

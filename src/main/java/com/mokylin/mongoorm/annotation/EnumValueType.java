@@ -17,5 +17,6 @@ public enum EnumValueType {
      */
     STRING,
 
+
     CUSTOM
 }
