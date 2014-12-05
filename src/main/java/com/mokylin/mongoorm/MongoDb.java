@@ -18,22 +18,27 @@ public class MongoDb {
 
     private static Logger LOGGER = LoggerFactory.getLogger(MongoDb.class);
 
-    private MongoDb(){
+    private MongoDb() {
         initDb();
     }
 
-    private static String getConfigPath(){
+    private static String getConfigPath() {
         return ConfigInfo.getConfigPath();
     }
+
     /**
      * 初始化db连接属性
      */
     public void initDb() {
-        if(StringUtils.isBlank(getConfigPath())){
+        if (StringUtils.isBlank(getConfigPath())) {
             throw new IllegalStateException("没有配置configPath");
         }
         if (mongo == null) {
             try {
+                ConfigInfo configInfo = ConfigInfo.instanseOf(getConfigPath());
+                dbUrl = configInfo.getString(ConfigInfo.DB_URL);
+                dbPort = configInfo.getInt(ConfigInfo.DB_PORT);
+                dbName = configInfo.getString(ConfigInfo.DB_NAME);
                 mongo = new Mongo(dbUrl, dbPort);
                 int poolSize = ConfigInfo.instanseOf(getConfigPath()).getInt(ConfigInfo.DB_POOL_SIZE);// 连接数量
                 int blockSize = ConfigInfo.instanseOf(getConfigPath()).getInt(ConfigInfo.DB_BLOCK_SIZE); // 等待队列长度
@@ -56,7 +61,7 @@ public class MongoDb {
                 }
             }
         }
-        Runtime.getRuntime().addShutdownHook(new Thread(){
+        Runtime.getRuntime().addShutdownHook(new Thread() {
             @Override
             public void run() {
                 getInstance().destroy();
@@ -75,14 +80,8 @@ public class MongoDb {
         db = null;
     }
 
-    private static MongoDb instance = new MongoDb();
 
-    static {
-        ConfigInfo configInfo = ConfigInfo.instanseOf(getConfigPath());
-        instance.dbUrl = configInfo.getString(ConfigInfo.DB_URL);
-        instance.dbPort = configInfo.getInt(ConfigInfo.DB_PORT);
-        instance.dbName = configInfo.getString(ConfigInfo.DB_NAME);
-    }
+    private static MongoDb instance = new MongoDb();
 
     public static MongoDb getInstance() {
         return instance;

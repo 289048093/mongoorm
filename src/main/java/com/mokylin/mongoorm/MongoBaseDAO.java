@@ -3,6 +3,7 @@ package com.mokylin.mongoorm;
 import com.mokylin.mongoorm.annotation.*;
 import com.mokylin.mongoorm.cache.ClassInfoCache;
 import com.mongodb.*;
+import org.apache.commons.lang3.StringUtils;
 import org.bson.types.ObjectId;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -172,6 +173,9 @@ public class MongoBaseDAO<T extends BaseModel> extends AbstractBaseDAO<T> {
                 continue;
             }
             String dbCol = column.value();
+            if(StringUtils.isBlank(dbCol)){
+                dbCol = field.getName();
+            }
             try {
                 Object fieldVal = field.get(entity);
                 Object dbVal = fieldVal;
@@ -236,6 +240,9 @@ public class MongoBaseDAO<T extends BaseModel> extends AbstractBaseDAO<T> {
             for (Field field : fields) {
                 Column column = ClassInfoCache.getAnnotation(field, Column.class);
                 String dbCol = column.value();
+                if(StringUtils.isBlank(dbCol)){
+                    dbCol = field.getName();
+                }
                 Object dbVal = dbo.get(dbCol);
                 if (dbVal == null) {
                     continue;
