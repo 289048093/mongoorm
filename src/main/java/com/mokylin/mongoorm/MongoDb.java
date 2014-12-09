@@ -36,8 +36,8 @@ public class MongoDb {
         if (mongo == null) {
             try {
                 ConfigInfo configInfo = ConfigInfo.instanseOf(getConfigPath());
-                dbUrl = configInfo.getString(ConfigInfo.DB_URL);
-                dbPort = configInfo.getInt(ConfigInfo.DB_PORT);
+                String dbUrl = configInfo.getString(ConfigInfo.DB_URL);
+                int dbPort = configInfo.getInt(ConfigInfo.DB_PORT);
                 dbName = configInfo.getString(ConfigInfo.DB_NAME);
                 mongo = new Mongo(dbUrl, dbPort);
                 int poolSize = ConfigInfo.instanseOf(getConfigPath()).getInt(ConfigInfo.DB_POOL_SIZE);// 连接数量
@@ -87,8 +87,6 @@ public class MongoDb {
         return instance;
     }
 
-    private String dbUrl;
-    private int dbPort;
     private String dbName;
     private Mongo mongo;
     private DB db;

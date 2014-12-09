@@ -21,22 +21,36 @@ import java.util.concurrent.ConcurrentHashMap;
  * @since 2014/11/24.
  */
 
-public class MongoBaseDAO<T extends BaseModel> extends AbstractBaseDAO<T> {
+public abstract class MongoBaseDAO<T extends BaseModel> extends AbstractBaseDAO<T> {
 
     private static final Logger LOGGER = LoggerFactory.getLogger(MongoBaseDAO.class);
 
-    private static final ConcurrentHashMap<Class<? extends BaseModel>, MongoBaseDAO<? extends BaseModel>> instances = new ConcurrentHashMap<>();
+    private static final ConcurrentHashMap<String, MongoBaseDAO<? extends BaseModel>> instances = new ConcurrentHashMap<>();
 
-    public static <V extends BaseModel> MongoBaseDAO<V> instanceOf(Class<V> clazz) {
+    private String dbTableName = null;
+
+    protected static <R extends MongoBaseDAO<V>, V extends BaseModel> R instanceOf(Class<V> clazz, DaoBuilder<R> builder) {
+       return instanceOf(clazz.getName(),builder);
+    }
+
+    protected static <R extends MongoBaseDAO<V>, V extends BaseModel> R instanceOf(String key, DaoBuilder<R> builder) {
         //noinspection unchecked
-        MongoBaseDAO<V> dao = (MongoBaseDAO<V>) instances.get(clazz);
+        MongoBaseDAO<V> dao = (MongoBaseDAO<V>) instances.get(key);
         if (dao != null) {
-            return dao;
+            return (R) dao;
         }
-        MongoBaseDAO<V> daoTmp = new MongoBaseDAO<>();
-        daoTmp.setModelClazz(clazz);
-        MongoBaseDAO existDao = instances.putIfAbsent(clazz, daoTmp);
-        return existDao != null ? existDao : daoTmp;
+        R daoTmp = builder.newInstance();
+//        daoTmp.setModelClazz(clazz);
+        MongoBaseDAO existDao = instances.putIfAbsent(key, daoTmp);
+        return existDao != null ? (R) existDao : daoTmp;
+    }
+
+        protected static ConcurrentHashMap<String, MongoBaseDAO<? extends BaseModel>> getAllInstances() {
+        return instances;
+    }
+
+    protected static interface DaoBuilder<T extends MongoBaseDAO> {
+        T newInstance();
     }
 
     @Override
@@ -141,6 +155,17 @@ public class MongoBaseDAO<T extends BaseModel> extends AbstractBaseDAO<T> {
 
     @Override
     public DBCollection getCollection() {
+        return MongoDb.getInstance().getCollection(getDbTableName());
+    }
+
+    protected void setDbTableName(String dbTableName) {
+        this.dbTableName = dbTableName;
+    }
+
+    protected String getDbTableName() {
+        if(dbTableName!=null){
+            return dbTableName;
+        }
         Table annotation = ClassInfoCache.getAnnotation(getModelClazz(), Table.class);
         String tableName;
         if (annotation != null) {
@@ -149,7 +174,8 @@ public class MongoBaseDAO<T extends BaseModel> extends AbstractBaseDAO<T> {
 //            throw new IllegalArgumentException("该类没有指定Table");
             tableName = getModelClazz().getSimpleName();
         }
-        return MongoDb.getInstance().getCollection(tableName);
+        dbTableName = tableName;
+        return tableName;
     }
 
 
@@ -173,7 +199,7 @@ public class MongoBaseDAO<T extends BaseModel> extends AbstractBaseDAO<T> {
                 continue;
             }
             String dbCol = column.value();
-            if(StringUtils.isBlank(dbCol)){
+            if (StringUtils.isBlank(dbCol)) {
                 dbCol = field.getName();
             }
             try {
@@ -212,7 +238,7 @@ public class MongoBaseDAO<T extends BaseModel> extends AbstractBaseDAO<T> {
                 if (customAnn != null) {
                     Class<? extends CustomConverter> converterClazz = customAnn.converter();
                     CustomConverter converter = ClassInfoCache.getSingleton(converterClazz);
-                    converter.setFieldClazz(field.getDeclaringClass());
+                    converter.setFieldClazz(field.getType());
                     dbVal = converter.serialize(fieldVal);
                 }
                 object.put(dbCol, dbVal);
@@ -240,7 +266,7 @@ public class MongoBaseDAO<T extends BaseModel> extends AbstractBaseDAO<T> {
             for (Field field : fields) {
                 Column column = ClassInfoCache.getAnnotation(field, Column.class);
                 String dbCol = column.value();
-                if(StringUtils.isBlank(dbCol)){
+                if (StringUtils.isBlank(dbCol)) {
                     dbCol = field.getName();
                 }
                 Object dbVal = dbo.get(dbCol);
@@ -255,14 +281,14 @@ public class MongoBaseDAO<T extends BaseModel> extends AbstractBaseDAO<T> {
                     fieldVal = dbVal;
                 }
                 Custom customAnn = ClassInfoCache.getAnnotation(field, Custom.class);
-                if (BaseModel.class.isAssignableFrom(field.getDeclaringClass())) {
-                    fieldVal = field.getDeclaringClass().newInstance();
+                if (BaseModel.class.isAssignableFrom(field.getType())) {
+                    fieldVal = field.getType().newInstance();
                     ((BaseModel) fieldVal).setId((ObjectId) dbVal);
                 }
                 if (customAnn != null) {
                     Class<? extends CustomConverter> converterClazz = customAnn.converter();
                     CustomConverter converter = ClassInfoCache.getSingleton(converterClazz);
-                    converter.setFieldClazz(field.getDeclaringClass());
+                    converter.setFieldClazz(field.getType());
                     fieldVal = converter.deSerialize(dbVal);
                 }
                 field.set(t, fieldVal);
@@ -275,16 +301,20 @@ public class MongoBaseDAO<T extends BaseModel> extends AbstractBaseDAO<T> {
 
     private Object getEnumValue(Field field, Object dbVal) throws NoSuchMethodException, IllegalAccessException, InvocationTargetException, NoSuchFieldException {
         EnumValue enumAnn = ClassInfoCache.getAnnotation(field, EnumValue.class);
-        EnumValueType annValue = enumAnn.value();
+        EnumValueType annValue = enumAnn==null?EnumValueType.NAME:enumAnn.value();
         //noinspection unchecked
         Class<? extends Enum> fieldEnum = (Class<? extends Enum>) field.getType();
         switch (annValue) {
             case NAME:
-                return Enum.valueOf(fieldEnum, dbVal.toString());
+                try {
+                    return Enum.valueOf(fieldEnum, dbVal.toString());
+                } catch (Exception e) {
+                    return null;
+                }
             case STRING:
                 return getEnumByToString(fieldEnum, dbVal);
             case CUSTOM:
-                String enumMethodName = enumAnn.method();
+                String enumMethodName = enumAnn==null?"name":enumAnn.method();
                 return getEnumByMethodValue(enumMethodName, fieldEnum, dbVal);
         }
         return null;
