@@ -91,8 +91,6 @@ public class MongoDb {
     private Mongo mongo;
     private DB db;
 
-    public final ConcurrentHashMap<String, DBCollection> cache = new ConcurrentHashMap<>();
-
     public DBCollection getCollection(String tableName) {
         return db.getCollection(tableName);
     }
