@@ -6,8 +6,12 @@ import com.mokylin.mongoorm.util.ConfigInfo;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
+import test.com.mokylin.mongoorm.dao.RoleDAO;
+import test.com.mokylin.mongoorm.dao.UserDAO;
 import test.com.mokylin.mongoorm.model.RoleModel;
 import test.com.mokylin.mongoorm.model.UserModel;
+
+import java.util.List;
 
 /** 
 * MongoBaseDAO Tester. 
@@ -41,10 +45,12 @@ public void testInstanceOf() throws Exception {
     RoleModel role = new RoleModel();
     role.setName("程序员");
     user.setRole(role);
-    MongoBaseDAO<RoleModel> roleDao = MongoBaseDAO.instanceOf(RoleModel.class);
+    MongoBaseDAO<RoleModel> roleDao = RoleDAO.getInstance();
     roleDao.insert(role);
-    MongoBaseDAO<UserModel> userDao = MongoBaseDAO.instanceOf(UserModel.class);
-    userDao.insert(user);
+    MongoBaseDAO<UserModel> userDao = UserDAO.getInstance();
+    userDao.insert(user);new UserDAO();
+    List<UserModel> all = userDao.findAll();
+    System.out.println(all);
 } 
 
 /** 
