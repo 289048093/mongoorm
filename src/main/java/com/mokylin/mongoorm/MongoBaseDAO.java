@@ -21,7 +21,7 @@ import java.util.concurrent.ConcurrentHashMap;
  * @since 2014/11/24.
  */
 
-public abstract class MongoBaseDAO<T extends BaseModel> extends AbstractBaseDAO<T> {
+public class MongoBaseDAO<T extends BaseModel> extends AbstractBaseDAO<T> {
 
     private static final Logger LOGGER = LoggerFactory.getLogger(MongoBaseDAO.class);
 
@@ -29,11 +29,11 @@ public abstract class MongoBaseDAO<T extends BaseModel> extends AbstractBaseDAO<
 
     private String dbTableName = null;
 
-    protected static <R extends MongoBaseDAO<V>, V extends BaseModel> R instanceOf(Class<V> clazz, DaoBuilder<R> builder) {
+    public static <R extends MongoBaseDAO<V>, V extends BaseModel> R instanceOf(Class<V> clazz, DaoBuilder<R> builder) {
        return instanceOf(clazz.getName(),builder);
     }
 
-    protected static <R extends MongoBaseDAO<V>, V extends BaseModel> R instanceOf(String key, DaoBuilder<R> builder) {
+    public static <R extends MongoBaseDAO<V>, V extends BaseModel> R instanceOf(String key, DaoBuilder<R> builder) {
         //noinspection unchecked
         MongoBaseDAO<V> dao = (MongoBaseDAO<V>) instances.get(key);
         if (dao != null) {
@@ -49,7 +49,7 @@ public abstract class MongoBaseDAO<T extends BaseModel> extends AbstractBaseDAO<
         return instances;
     }
 
-    protected static interface DaoBuilder<T extends MongoBaseDAO> {
+    public static interface DaoBuilder<T extends MongoBaseDAO> {
         T newInstance();
     }
 
