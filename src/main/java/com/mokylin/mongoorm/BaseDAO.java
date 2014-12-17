@@ -26,7 +26,9 @@ public interface BaseDAO<T extends BaseModel> {
 
     T findOne(DBObject query);
 
-    public List<T> find(DBObject query, int start, int limit);
+    List<T> find(DBObject query, int start, int limit);
+
+    List<T> find(DBObject query, int start, int limit, DBObject sort);
 
     List<T> findAll();
 

@@ -1,5 +1,6 @@
 package com.mokylin.mongoorm.util;
 
+import org.apache.commons.lang3.StringUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -38,6 +39,9 @@ public class ConfigInfo {
     private static String configPath;
 
     public static String getConfigPath() {
+        if(StringUtils.isBlank(configPath)){
+            configPath = "mongodb.properties";
+        }
         return configPath;
     }
 
@@ -69,7 +73,8 @@ public class ConfigInfo {
         }
     }
 
-    public static ConfigInfo instanseOf(String cfgFileName) {
+    public static ConfigInfo getInstance() {
+        String cfgFileName = getConfigPath();
         ConfigInfo res = null;
         if ((res = cfgs.get(cfgFileName)) == null) {
             synchronized (cfgs) {

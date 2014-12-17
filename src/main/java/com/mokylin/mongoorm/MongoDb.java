@@ -7,7 +7,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.net.UnknownHostException;
-import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * MongoDb单例
@@ -35,13 +34,13 @@ public class MongoDb {
         }
         if (mongo == null) {
             try {
-                ConfigInfo configInfo = ConfigInfo.instanseOf(getConfigPath());
+                ConfigInfo configInfo = ConfigInfo.getInstance();
                 String dbUrl = configInfo.getString(ConfigInfo.DB_URL);
                 int dbPort = configInfo.getInt(ConfigInfo.DB_PORT);
                 dbName = configInfo.getString(ConfigInfo.DB_NAME);
                 mongo = new Mongo(dbUrl, dbPort);
-                int poolSize = ConfigInfo.instanseOf(getConfigPath()).getInt(ConfigInfo.DB_POOL_SIZE);// 连接数量
-                int blockSize = ConfigInfo.instanseOf(getConfigPath()).getInt(ConfigInfo.DB_BLOCK_SIZE); // 等待队列长度
+                int poolSize = ConfigInfo.getInstance().getInt(ConfigInfo.DB_POOL_SIZE);// 连接数量
+                int blockSize = ConfigInfo.getInstance().getInt(ConfigInfo.DB_BLOCK_SIZE); // 等待队列长度
                 MongoOptions opt = mongo.getMongoOptions();
                 opt.connectionsPerHost = poolSize;
                 opt.threadsAllowedToBlockForConnectionMultiplier = blockSize;
@@ -53,9 +52,9 @@ public class MongoDb {
         }
         if (db == null) {
             db = mongo.getDB(dbName);
-            String dbUser = ConfigInfo.instanseOf(getConfigPath()).getString(ConfigInfo.DB_JDBC_USER);
+            String dbUser = ConfigInfo.getInstance().getString(ConfigInfo.DB_JDBC_USER);
             if (StringUtils.isNotBlank(dbUser)) {
-                boolean auth = db.authenticate(dbUser, ConfigInfo.instanseOf(getConfigPath()).getString(ConfigInfo.DB_JDBC_PASSWORD).toCharArray());
+                boolean auth = db.authenticate(dbUser, ConfigInfo.getInstance().getString(ConfigInfo.DB_JDBC_PASSWORD).toCharArray());
                 if (!auth) {
                     throw new RuntimeException("用户认证失败,请确认用户名密码正确");
                 }

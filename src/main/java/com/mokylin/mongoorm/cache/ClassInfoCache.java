@@ -51,8 +51,9 @@ public class ClassInfoCache {
      * @param methodName
      * @return
      */
-    public static Method getMethod(Class<?> clazz, String methodName) {
-        return getAllMethod(clazz).get(methodName);
+    public static Method getMethod(Class<?> clazz, String methodName,Class<?>... paramTypes) {
+
+        return getAllMethod(clazz).get(getMethodCacheKey(methodName,paramTypes));
     }
 
     /**
@@ -91,10 +92,20 @@ public class ClassInfoCache {
         }
         for (Method m : methods) {
             m.setAccessible(true);
-            res.put(m.getName(), m);
+            String name = m.getName();
+            Class<?>[] parameterTypes = m.getParameterTypes();
+            res.put(getMethodCacheKey(name,parameterTypes), m);
         }
         res.putAll(_getAllMethod(clazz.getSuperclass()));
         return res;
+    }
+
+    private static String getMethodCacheKey(String methodName,Class<?>[] parameterTypes){
+        StringBuilder names = new StringBuilder(methodName);
+        for(Class<?> ct:parameterTypes){
+            names.append(ct.getName());
+        }
+        return names.toString();
     }
 
     /**

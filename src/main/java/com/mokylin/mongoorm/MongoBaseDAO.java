@@ -21,7 +21,7 @@ import java.util.concurrent.ConcurrentHashMap;
  * @since 2014/11/24.
  */
 
-public class MongoBaseDAO<T extends BaseModel> extends AbstractBaseDAO<T> {
+public abstract class MongoBaseDAO<T extends BaseModel> extends AbstractBaseDAO<T> {
 
     private static final Logger LOGGER = LoggerFactory.getLogger(MongoBaseDAO.class);
 
@@ -30,7 +30,7 @@ public class MongoBaseDAO<T extends BaseModel> extends AbstractBaseDAO<T> {
     private String dbTableName = null;
 
     public static <R extends MongoBaseDAO<V>, V extends BaseModel> R instanceOf(Class<V> clazz, DaoBuilder<R> builder) {
-       return instanceOf(clazz.getName(),builder);
+        return instanceOf(clazz.getName(), builder);
     }
 
     public static <R extends MongoBaseDAO<V>, V extends BaseModel> R instanceOf(String key, DaoBuilder<R> builder) {
@@ -45,7 +45,7 @@ public class MongoBaseDAO<T extends BaseModel> extends AbstractBaseDAO<T> {
         return existDao != null ? (R) existDao : daoTmp;
     }
 
-        protected static ConcurrentHashMap<String, MongoBaseDAO<? extends BaseModel>> getAllInstances() {
+    protected static ConcurrentHashMap<String, MongoBaseDAO<? extends BaseModel>> getAllInstances() {
         return instances;
     }
 
@@ -86,12 +86,20 @@ public class MongoBaseDAO<T extends BaseModel> extends AbstractBaseDAO<T> {
 
     @Override
     public List<T> find(DBObject query, int start, int limit) {
+        return find(query, start, limit, null);
+    }
+
+    @Override
+    public List<T> find(DBObject query, int start, int limit, DBObject sort) {
         DBCursor dbObjects = getCollection().find(query);
         if (start > 0) {
             dbObjects.skip(start);
         }
         if (limit > 0) {
             dbObjects.limit(limit);
+        }
+        if (sort != null) {
+            dbObjects.sort(sort);
         }
         List<T> res = new LinkedList<>();
         for (DBObject o : dbObjects) {
@@ -163,7 +171,7 @@ public class MongoBaseDAO<T extends BaseModel> extends AbstractBaseDAO<T> {
     }
 
     protected String getDbTableName() {
-        if(dbTableName!=null){
+        if (dbTableName != null) {
             return dbTableName;
         }
         Table annotation = ClassInfoCache.getAnnotation(getModelClazz(), Table.class);
@@ -178,6 +186,27 @@ public class MongoBaseDAO<T extends BaseModel> extends AbstractBaseDAO<T> {
         return tableName;
     }
 
+    public void beginTransaction() {
+        getCollection().getDB().requestStart();
+    }
+
+    public void commitTransaction() {
+        getCollection().getDB().requestDone();
+    }
+
+
+    private static ThreadLocal<BasicDBObject> dboLocal = new InheritableThreadLocal<>();
+
+    public static BasicDBObject newBasicDBObject() {
+        BasicDBObject dbo = dboLocal.get();
+        if (dbo != null) {
+            dbo.clear();
+            return dbo;
+        }
+        dbo = new BasicDBObject();
+        dboLocal.set(dbo);
+        return dbo;
+    }
 
     /**
      * 通过实体生成MongoDB对象
@@ -189,7 +218,7 @@ public class MongoBaseDAO<T extends BaseModel> extends AbstractBaseDAO<T> {
         if (entity == null) {
             return null;
         }
-        DBObject object = new BasicDBObject();
+        BasicDBObject object = newBasicDBObject();
 
         Collection<Field> fields = ClassInfoCache.getPersistFields(entity.getClass());
 
@@ -263,7 +292,11 @@ public class MongoBaseDAO<T extends BaseModel> extends AbstractBaseDAO<T> {
         T t = null;
         try {
             t = getModelClazz().newInstance();
-            for (Field field : fields) {
+        } catch (Exception e) {
+            LOGGER.error(e.getMessage(), e);
+        }
+        for (Field field : fields) {
+            try {
                 Column column = ClassInfoCache.getAnnotation(field, Column.class);
                 String dbCol = column.value();
                 if (StringUtils.isBlank(dbCol)) {
@@ -291,17 +324,56 @@ public class MongoBaseDAO<T extends BaseModel> extends AbstractBaseDAO<T> {
                     converter.setFieldClazz(field.getType());
                     fieldVal = converter.deSerialize(dbVal);
                 }
+                Class<?> fieldClass = field.getType();
+                if (!fieldClass.isAssignableFrom(fieldVal.getClass())) {
+                    fieldVal = convertVal(fieldClass, fieldVal);
+                }
                 field.set(t, fieldVal);
+            } catch (Exception e) {
+                LOGGER.error(e.getMessage(), e);
             }
-        } catch (Exception e) {
-            LOGGER.error(e.getMessage(), e);
         }
         return t;
     }
 
+    private Object convertVal(Class<?> fieldClass, Object fieldVal) {
+        if (fieldVal == null) return null;
+        if (Integer.class.equals(fieldClass)
+                || int.class.equals(fieldClass)
+                && fieldVal instanceof Number) {
+            return ((Number) fieldVal).intValue();
+        }
+        if (Short.class.equals(fieldClass)
+                || short.class.equals(fieldClass)
+                && fieldVal instanceof Number) {
+            return ((Number) fieldVal).shortValue();
+        }
+        if (Byte.class.equals(fieldClass)
+                || byte.class.equals(fieldClass)
+                && fieldVal instanceof Number) {
+            return ((Number) fieldVal).byteValue();
+        }
+        if (Long.class.equals(fieldClass)
+                || long.class.equals(fieldClass)
+                && fieldVal instanceof Number) {
+            return ((Number) fieldVal).longValue();
+        }
+        if (Double.class.equals(fieldClass)
+                || double.class.equals(fieldClass)
+                && fieldVal instanceof Number) {
+            return ((Number) fieldVal).doubleValue();
+        }
+        if (Float.class.equals(fieldClass)
+                || float.class.equals(fieldClass)
+                && fieldVal instanceof Number) {
+            return ((Number) fieldVal).floatValue();
+        }
+        return fieldVal;
+    }
+
     private Object getEnumValue(Field field, Object dbVal) throws NoSuchMethodException, IllegalAccessException, InvocationTargetException, NoSuchFieldException {
         EnumValue enumAnn = ClassInfoCache.getAnnotation(field, EnumValue.class);
-        EnumValueType annValue = enumAnn==null?EnumValueType.NAME:enumAnn.value();
+        EnumValueType annValue = enumAnn == null ? EnumValueType.NAME : enumAnn.value();
         //noinspection unchecked
         Class<? extends Enum> fieldEnum = (Class<? extends Enum>) field.getType();
         switch (annValue) {
@@ -314,7 +386,7 @@ public class MongoBaseDAO<T extends BaseModel> extends AbstractBaseDAO<T> {
             case STRING:
                 return getEnumByToString(fieldEnum, dbVal);
             case CUSTOM:
-                String enumMethodName = enumAnn==null?"name":enumAnn.method();
+                String enumMethodName = enumAnn == null ? "name" : enumAnn.method();
                 return getEnumByMethodValue(enumMethodName, fieldEnum, dbVal);
         }
         return null;
