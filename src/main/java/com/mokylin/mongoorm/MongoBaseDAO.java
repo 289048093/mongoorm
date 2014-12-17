@@ -8,9 +8,7 @@ import org.bson.types.ObjectId;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.lang.reflect.Field;
-import java.lang.reflect.InvocationTargetException;
-import java.lang.reflect.Method;
+import java.lang.reflect.*;
 import java.util.Collection;
 import java.util.LinkedList;
 import java.util.List;
@@ -322,6 +320,8 @@ public abstract class MongoBaseDAO<T extends BaseModel> extends AbstractBaseDAO<
                     Class<? extends CustomConverter> converterClazz = customAnn.converter();
                     CustomConverter converter = ClassInfoCache.getSingleton(converterClazz);
                     converter.setFieldClazz(field.getType());
+                    Type type1 = ((ParameterizedType) converter.getClass().getGenericSuperclass()).getActualTypeArguments()[1];
+                    dbVal = convertVal((Class) type1, dbVal);
                     fieldVal = converter.deSerialize(dbVal);
                 }
                 Class<?> fieldClass = field.getType();
@@ -405,6 +405,7 @@ public abstract class MongoBaseDAO<T extends BaseModel> extends AbstractBaseDAO<
 
     private Object getEnumByMethodValue(String methodName, Class<? extends Enum> enumClass, Object fieldValue) throws NoSuchFieldException, IllegalAccessException, NoSuchMethodException, InvocationTargetException {
         Method method = ClassInfoCache.getMethod(enumClass, "values");
+        fieldValue = convertVal(method.getReturnType(), fieldValue);
         Object[] objs = (Object[]) method.invoke(enumClass);
         for (Object obj : objs) {
             Method enumMethod = ClassInfoCache.getMethod(obj.getClass(), methodName);
