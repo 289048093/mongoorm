@@ -12,6 +12,7 @@ import java.lang.reflect.*;
 import java.util.Collection;
 import java.util.LinkedList;
 import java.util.List;
+import java.util.Objects;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
@@ -123,9 +124,12 @@ public abstract class MongoBaseDAO<T extends BaseModel> extends AbstractBaseDAO<
 
     @Override
     public WriteResult update(T t) {
+        Objects.requireNonNull(t,"update object must not be null");
+        DBObject set = getDBObject(t);
+        set.removeField(BaseColumn.ID);
         return getCollection().update(
                 new BasicDBObject(BaseColumn.ID, t.getId()),
-                new BasicDBObject("$set", getDBObject(t)),
+                new BasicDBObject("$set", set),
                 false,
                 true);
     }
@@ -333,6 +337,9 @@ public abstract class MongoBaseDAO<T extends BaseModel> extends AbstractBaseDAO<
                 LOGGER.error(e.getMessage(), e);
             }
         }
+//        if(LOGGER.isDebugEnabled()){
+//            LOGGER.debug("dbObject to model,dbo:{},model:",dbo, JsonUtil.object2Json(t));
+//        }
         return t;
     }
 
@@ -404,12 +411,12 @@ public abstract class MongoBaseDAO<T extends BaseModel> extends AbstractBaseDAO<
     }
 
     private Object getEnumByMethodValue(String methodName, Class<? extends Enum> enumClass, Object fieldValue) throws NoSuchFieldException, IllegalAccessException, NoSuchMethodException, InvocationTargetException {
-        Method method = ClassInfoCache.getMethod(enumClass, "values");
-        fieldValue = convertVal(method.getReturnType(), fieldValue);
-        Object[] objs = (Object[]) method.invoke(enumClass);
-        for (Object obj : objs) {
-            Method enumMethod = ClassInfoCache.getMethod(obj.getClass(), methodName);
-            Object enumMethodReturnValue = enumMethod.invoke(obj);
+        Method valuesMethod = ClassInfoCache.getMethod(enumClass, "values");
+        Object[] enums = (Object[]) valuesMethod.invoke(enumClass);
+        Method getDBValueMethod = ClassInfoCache.getMethod(enumClass, methodName);
+        fieldValue = convertVal(getDBValueMethod.getReturnType(), fieldValue);
+        for (Object obj : enums) {
+            Object enumMethodReturnValue = getDBValueMethod.invoke(obj);
             if (enumMethodReturnValue.equals(fieldValue)) {
                 return obj;
             }
